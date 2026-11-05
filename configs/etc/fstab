@@ -1,0 +1,3 @@
+PARTLABEL=linux  /      ext4  rw,noatime                 0 1
+PARTLABEL=esp    /boot  vfat  rw,noatime,fmask=0022,dmask=0022 0 2
+PARTLABEL=persist /mnt/vendor/persist ext4 defaults,x-systemd.before=hexagonrpcd-sdsp.service 0 0

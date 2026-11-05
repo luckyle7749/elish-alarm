@@ -1,0 +1,12 @@
+[Unit]
+Description=Mark current boot slot as successful (Qualcomm A/B)
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/qbootctl -m
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

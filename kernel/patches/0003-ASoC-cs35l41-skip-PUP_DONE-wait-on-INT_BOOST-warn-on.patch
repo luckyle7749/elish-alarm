@@ -1,0 +1,48 @@
+From a52c9d967a607625807f5c6233b0d398be58c524 Mon Sep 17 00:00:00 2001
+From: arisu <arisu@localhost>
+Date: Wed, 4 Nov 2026 20:48:17 +0800
+Subject: [PATCH 3/3] ASoC: cs35l41: skip PUP_DONE wait on INT_BOOST, warn-only
+ PDN
+
+On elish (INT_BOOST) the PUP_DONE flag never sets; downstream k81
+uses a fixed 1ms settle after GLOBAL_EN instead of polling. Do the
+same, eliminating the per-enable 100ms stall and 'Enable(1) failed:
+-110' log spam. PDN timeout is now warn-only and not propagated,
+matching downstream behavior.
+---
+ sound/soc/codecs/cs35l41-lib.c | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/sound/soc/codecs/cs35l41-lib.c b/sound/soc/codecs/cs35l41-lib.c
+index b0fa80705be7..4fb244dfe698 100644
+--- a/sound/soc/codecs/cs35l41-lib.c
++++ b/sound/soc/codecs/cs35l41-lib.c
+@@ -1283,11 +1283,20 @@ int cs35l41_global_enable(struct device *dev, struct regmap *regmap, enum cs35l4
+ 			return ret;
+ 		}
+ 
+-		ret = regmap_read_poll_timeout(regmap, CS35L41_IRQ1_STATUS1,
+-					int_status, int_status & pup_pdn_mask,
+-					1000, 100000);
+-		if (ret)
+-			dev_err(dev, "Enable(%d) failed: %d\n", enable, ret);
++		if (enable) {
++			/* PUP_DONE is never flagged on this part; downstream
++			 * uses a fixed 1ms settle instead of polling.
++			 */
++			usleep_range(1000, 1100);
++		} else {
++			ret = regmap_read_poll_timeout(regmap, CS35L41_IRQ1_STATUS1,
++						int_status, int_status & pup_pdn_mask,
++						1000, 100000);
++			if (ret) {
++				dev_warn(dev, "PDN timeout\n");
++				ret = 0;
++			}
++		}
+ 
+ 		/* Clear PUP/PDN status */
+ 		regmap_write(regmap, CS35L41_IRQ1_STATUS1, pup_pdn_mask);
+-- 
+2.56.0
+

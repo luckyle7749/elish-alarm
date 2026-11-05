@@ -1,0 +1,4 @@
+# Build outputs ship via Releases, not git
+artifacts/
+*.tar.*
+headers*/

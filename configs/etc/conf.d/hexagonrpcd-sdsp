@@ -1,0 +1,2 @@
+# Path to the hexagonfs files exposed to the SLPI/sensor DSP
+hexagonrpcd_fw_dir=/usr/share/qcom/sm8250/Xiaomi/elish

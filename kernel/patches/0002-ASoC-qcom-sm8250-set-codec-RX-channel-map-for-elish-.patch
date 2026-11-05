@@ -1,0 +1,68 @@
+From 1d8c7654a73c3bb07ab2f1982dfc6601715116fc Mon Sep 17 00:00:00 2001
+From: arisu <arisu@localhost>
+Date: Wed, 4 Nov 2026 20:29:41 +0800
+Subject: [PATCH 2/3] ASoC: qcom: sm8250: set codec RX channel map for elish
+ stereo
+
+The ADSP packs stereo into TDM slot0's 32-bit word: byte0 = left,
+byte2 = right. All 8 CS35L41 amps defaulted to byte0 so every
+speaker played left only.
+
+Map codec RX slots per amp group: 'T' amps (landscape left side)
+take byte0, 'B' amps (landscape right side) take byte2. Verified
+per-driver: all 8 amps play at their correct physical positions.
+---
+ sound/soc/qcom/sm8250.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/qcom/sm8250.c b/sound/soc/qcom/sm8250.c
+index 138f09bf823e..707869c318ae 100644
+--- a/sound/soc/qcom/sm8250.c
++++ b/sound/soc/qcom/sm8250.c
+@@ -20,6 +20,10 @@
+ #define TDM_BCLK_RATE		12288000
+ 
+ static unsigned int tdm_slot_offset[8] = {0, 4, 8, 12, 16, 20, 24, 28};
++/* codec rx positions are byte offsets inside the 32-bit slot0:
++ * high 16 bits (byte0) = left channel, low 16 bits (byte2) = right */
++static unsigned int codec_rx_slot_left[2] = {0, 2};
++static unsigned int codec_rx_slot_right[2] = {2, 0};
+ 
+ struct sm8250_snd_data {
+ 	bool stream_prepared[AFE_PORT_MAX];
+@@ -63,8 +67,8 @@ static int sm8250_tdm_snd_hw_params(struct snd_pcm_substream *substream,
+ {
+ 	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
+ 	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
+-
+-	int ret = 0;
++	struct snd_soc_dai *codec_dai;
++	int i, ret = 0;
+ 	int channels, slots, slot_width;
+ 
+ 	channels = params_channels(params);
+@@ -87,6 +91,21 @@ static int sm8250_tdm_snd_hw_params(struct snd_pcm_substream *substream,
+ 	                          __func__, ret);
+ 	          goto end;
+ 	  }
++
++	  for_each_rtd_codec_dais(rtd, i, codec_dai) {
++		  const char *prefix = codec_dai->component->name_prefix;
++		  const unsigned int *slots = codec_rx_slot_left;
++
++		  if (prefix && prefix[0] == 'B')
++			  slots = codec_rx_slot_right;
++		  ret = snd_soc_dai_set_channel_map(codec_dai, 0, NULL,
++						    channels, slots);
++		  if (ret < 0) {
++			  dev_err(rtd->dev, "%s: failed to set codec channel map on %s, err:%d\n",
++				  __func__, codec_dai->name, ret);
++			  goto end;
++		  }
++	  }
+ 	} else {
+ 	   ret = snd_soc_dai_set_tdm_slot(cpu_dai, 0xf, 0,
+ 	                    slots, slot_width);
+-- 
+2.56.0
+

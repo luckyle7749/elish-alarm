@@ -1,0 +1,9 @@
+# ath11k on elish reports an all-zero permanent MAC. Assign a locally
+# administered address: persistent = unique per device (derived from
+# machine-id), stable across reboots. No manual configuration needed.
+[Match]
+Driver=ath11k*
+
+[Link]
+Name=wlan0
+MACAddressPolicy=persistent
