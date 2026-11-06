@@ -174,7 +174,7 @@ sudo systemctl enable iwd pcie-rescan
 **MAC 两种写法**:
 
 - 仓库默认 `MACAddressPolicy=persistent`——每机唯一、零配置;**未实机验证**（原理上与驱动无关，应可行）
-- 实测设备用的是**固定出厂 MAC**（安卓真实 MAC，已验证）：把 `MACAddressPolicy` 行换成 `MACAddress=<你的出厂MAC>`。出厂 MAC 在 `persist` 分区的 `wlan/wlan_mac.bin` 里（格式 `wlan0=AABBCCDDEEFF`)
+- 实测设备用的是**固定出厂 MAC**（安卓真实 MAC，已验证）：用 `10-ath11k.factory-mac.link.example` 模板——填入你的出厂 MAC 后改名为 `10-ath11k.link` 替换默认文件。出厂 MAC 在 `persist` 分区的 `wlan/wlan_mac.bin` 里（格式 `wlan0=AABBCCDDEEFF`)
 
 **首启即联网**:进系统前把凭据写进 rootfs,iwd 起来自动连:
 
@@ -211,7 +211,9 @@ sudo systemctl enable --now elish-btaddr.service
 
 默认动态模式：脚本从 `persist` 的 `bluetooth/.bt_nv.bin`(6 字节
 裸二进制，= Wi-Fi MAC+1）读出本机出厂地址写入——任何机器零配置。
-想写死：给 service 加 drop-in `systemctl edit elish-btaddr`:
+想写死：用 `elish-btaddr.service.d/override.conf.example` 模板——
+填入出厂 BT MAC 后去掉 `.example` 后缀（即 `override.conf`,
+等价于 `systemctl edit elish-btaddr` 写入）:
 
 ```ini
 [Service]

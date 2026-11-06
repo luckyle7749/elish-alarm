@@ -187,7 +187,7 @@ sudo systemctl enable iwd pcie-rescan
 **Two MAC options**:
 
 - Repo default `MACAddressPolicy=persistent` — unique per device, zero config; **not verified on real hardware** (driver-agnostic, should work)
-- The test device uses its **fixed factory MAC** (the real Android MAC — verified): replace the policy line with `MACAddress=<your factory MAC>`. It lives in the `persist` partition at `wlan/wlan_mac.bin` (format `wlan0=AABBCCDDEEFF`)
+- The test device uses its **fixed factory MAC** (the real Android MAC — verified): use the `10-ath11k.factory-mac.link.example` template — fill in your factory MAC, then rename it to `10-ath11k.link` replacing the default file. The MAC lives in the `persist` partition at `wlan/wlan_mac.bin` (format `wlan0=AABBCCDDEEFF`)
 
 **Online on first boot**: write credentials into the rootfs beforehand and iwd
 auto-connects:
@@ -228,8 +228,10 @@ sudo systemctl enable --now elish-btaddr.service
 
 Default is dynamic mode: the script reads this unit's factory address from
 persist `bluetooth/.bt_nv.bin` (6 raw bytes, = Wi-Fi MAC+1) — zero
-configuration on any device. To hardcode instead, add a drop-in via
-`systemctl edit elish-btaddr`:
+configuration on any device. To hardcode instead, use the
+`elish-btaddr.service.d/override.conf.example` template — fill in your
+factory BT MAC and drop the `.example` suffix (i.e. `override.conf`;
+equivalent to writing it via `systemctl edit elish-btaddr`):
 
 ```ini
 [Service]

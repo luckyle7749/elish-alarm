@@ -1,0 +1,7 @@
+# Hardcoded variant — the default service reads the factory BT address from
+# persist bluetooth/.bt_nv.bin at runtime. To hardcode instead: set YOUR
+# factory BT MAC below (= Wi-Fi MAC + 1) and rename this file to
+# override.conf (drop the .example suffix; only *.conf is loaded).
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/elish-btaddr.sh AA:BB:CC:DD:EE:FF

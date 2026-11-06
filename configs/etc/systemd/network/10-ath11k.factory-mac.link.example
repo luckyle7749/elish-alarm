@@ -1,0 +1,10 @@
+# Hardcoded factory-MAC variant — replaces the default MACAddressPolicy file.
+# To use: set YOUR factory Wi-Fi MAC below (persist wlan/wlan_mac.bin,
+# format wlan0=AABBCCDDEEFF), then rename this file to 10-ath11k.link and
+# remove the default one — the two must not coexist.
+[Match]
+Driver=ath11k*
+
+[Link]
+Name=wlan0
+MACAddress=AA:BB:CC:DD:EE:FF
