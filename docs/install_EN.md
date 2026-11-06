@@ -231,6 +231,7 @@ yay -S hexagonrpcd qbootctl libssc-git
 sudo cp configs/etc/conf.d/hexagonrpcd-sdsp /etc/conf.d/
 sudo cp configs/etc/udev/rules.d/61-libssc.rules /etc/udev/rules.d/
 sudo cp configs/etc/systemd/system/qbootctl.service /etc/systemd/system/
+sudo cp -r configs/etc/systemd/system/hexagonrpcd-sdsp.service.d /etc/systemd/system/
 sudo cp -r configs/etc/systemd/system/iio-sensor-proxy.service.d /etc/systemd/system/
 
 sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=misc
@@ -243,6 +244,7 @@ sudo systemctl enable --now hexagonrpcd-sdsp qbootctl iio-sensor-proxy
 | `61-libssc.rules` | Tags fastrpc devices with `IIO_SENSOR_PROXY_TYPE` (the proxy's accel driver claims devices by this tag) + `ACCEL_MOUNT_MATRIX` |
 | `qbootctl.service` | Marks the current slot successful every boot — without it the retry counter runs out and the bootloader **flips back to the Android slot** |
 | fstab `persist` line | SLPI reads/writes `/mnt/vendor/persist/sensors` calibration data; unmounted = crash loop returns |
+| `hexagonrpcd-sdsp` drop-in | `Restart=always` — the daemon occasionally **exits cleanly** (status 0, after tens of minutes); systemd treats that as "done" and never restarts it, then the SLPI watchdog crash-loops and all sensors silently die (the errors point elsewhere — very hard to trace). It must come back every time |
 | `iio-sensor-proxy` drop-in | A fuse: if the sensor stack misbehaves (persist unmounted, daemons missing) the proxy stops responding and stalls shutdown for the default 90s — this caps it at 10s; does nothing when the stack is healthy |
 
 After mounting, **fix permissions once** — the sensor registry in persist is
@@ -278,6 +280,15 @@ unanswered. **Don't SIGKILL**: `sudo systemctl restart hexagonrpcd-sdsp
 iio-sensor-proxy` (restarting the daemon lets the DSP notice the dead link);
 reboot if that fails. The repo's proxy drop-in adds
 `After=/Wants=hexagonrpcd-sdsp` for correct ordering.
+
+⚠️ **Suspend is currently broken**: after s2idle resume the QMI/sensor
+subscription state is unrecoverable — the SLPI crash loop returns, and
+restarting daemon/proxy or resetting the remoteproc cannot fix it; only a
+full reboot recovers. Recommend masking it and using screen-off only:
+
+```sh
+sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+```
 
 ## 6. Flash UEFI, first boot
 

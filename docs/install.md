@@ -214,6 +214,7 @@ yay -S hexagonrpcd qbootctl libssc-git
 sudo cp configs/etc/conf.d/hexagonrpcd-sdsp /etc/conf.d/
 sudo cp configs/etc/udev/rules.d/61-libssc.rules /etc/udev/rules.d/
 sudo cp configs/etc/systemd/system/qbootctl.service /etc/systemd/system/
+sudo cp -r configs/etc/systemd/system/hexagonrpcd-sdsp.service.d /etc/systemd/system/
 sudo cp -r configs/etc/systemd/system/iio-sensor-proxy.service.d /etc/systemd/system/
 
 sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=misc
@@ -226,6 +227,7 @@ sudo systemctl enable --now hexagonrpcd-sdsp qbootctl iio-sensor-proxy
 | `61-libssc.rules` | 给 fastrpc 设备打 `IIO_SENSOR_PROXY_TYPE` 标签(iio-sensor-proxy 的 accel 驱动靠它认领设备)+ `ACCEL_MOUNT_MATRIX` 挂载矩阵 |
 | `qbootctl.service` | 每次开机把当前槽位标 successful——不标的话启动计数扣完，bootloader 会**自动切回 Android 槽位** |
 | fstab `persist` 行 | SLPI 要读写 `/mnt/vendor/persist/sensors` 校准数据；没挂载 = 崩溃循环复发 |
+| `hexagonrpcd-sdsp` drop-in | `Restart=always`——daemon 会偶发**干净退出**(status 0，运行数十分钟后),systemd 视其为"完成"不再拉起，随后 SLPI 看门狗崩溃循环、传感器静默全灭(报错都指向别处，极难排查)。必须让它死必复活 |
 | `iio-sensor-proxy` drop-in | 保险丝:传感器栈异常时(如 persist 未挂载、守护未起)代理会停不下来,把关机等待从默认 90s 压到 10s;栈正常时它不参与任何功能 |
 
 挂载后**还要修一次权限**——persist 里的传感器注册表属主是安卓
@@ -256,6 +258,14 @@ sudo find /mnt/vendor/persist/sensors/registry -type d -exec chmod g+s {} +
 `sudo systemctl restart hexagonrpcd-sdsp iio-sensor-proxy`（重启 daemon
 让 DSP 感知断链），不行就重启整机。仓库的 proxy drop-in 已加
 `After=/Wants=hexagonrpcd-sdsp` 保证启动顺序。
+
+⚠️ **休眠(suspend)目前不可用**:s2idle 唤醒后 QMI/传感器订阅状态
+不可恢复——SLPI 崩溃循环复发，且重启 daemon/proxy、重置 remoteproc
+均无法救回，只能整机重启。建议直接屏蔽，只用熄屏：
+
+```sh
+sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+```
 
 ## 6. 刷入 UEFI,首启
 
