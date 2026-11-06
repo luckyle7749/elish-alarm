@@ -198,6 +198,30 @@ iwd 不在 ALARM base 里——没有网就装不了它。两条路：
 ALARM 默认账户 `alarm:alarm`,`root:root`(sshd 随 base 启用，能直接
 ssh 进去——前提是 wlan0 已上线）。
 
+**蓝牙（QCA6390 出厂无地址）**：芯片上电后 `hci0` 携带全零 BDADDR
+注册，内核把它标成"未配置"——`bluetoothctl` 里**根本看不到控制器**
+（现象：`No default controller available`，但 dmesg 固件下载成功）。
+修法是把出厂地址写进去。仓库提供脚本+service:
+
+```sh
+sudo install -Dm755 configs/usr/local/bin/elish-btaddr.sh -t /usr/local/bin/
+sudo cp configs/etc/systemd/system/elish-btaddr.service /etc/systemd/system/
+sudo systemctl enable --now elish-btaddr.service
+```
+
+默认动态模式：脚本从 `persist` 的 `bluetooth/.bt_nv.bin`(6 字节
+裸二进制，= Wi-Fi MAC+1）读出本机出厂地址写入——任何机器零配置。
+想写死：给 service 加 drop-in `systemctl edit elish-btaddr`:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/elish-btaddr.sh 你的出厂BT_MAC
+```
+
+验证：`bluetoothctl show` 应列出 `elish` 控制器且 `Powered: yes`,
+`bluetoothctl scan on` 能扫到周边设备。
+
 ## 5.5 传感器 + A/B 槽位（可选项，强烈建议）
 
 elish 的加速度计/陀螺仪/光感/磁力计由 SLPI（传感器协处理器）托管，

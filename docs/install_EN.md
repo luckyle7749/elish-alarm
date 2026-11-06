@@ -214,6 +214,32 @@ out:
 ALARM default accounts are `alarm:alarm` and `root:root` (sshd is enabled in
 base — ssh works as soon as wlan0 is up).
 
+**Bluetooth (QCA6390 ships with no address)**: after power-up `hci0`
+registers with an all-zero BDADDR, the kernel marks it "unconfigured" and
+`bluetoothctl` shows **no controller at all** (`No default controller
+available`) even though firmware download succeeded in dmesg. The fix is to
+program the factory address. The repo ships a script + service:
+
+```sh
+sudo install -Dm755 configs/usr/local/bin/elish-btaddr.sh -t /usr/local/bin/
+sudo cp configs/etc/systemd/system/elish-btaddr.service /etc/systemd/system/
+sudo systemctl enable --now elish-btaddr.service
+```
+
+Default is dynamic mode: the script reads this unit's factory address from
+persist `bluetooth/.bt_nv.bin` (6 raw bytes, = Wi-Fi MAC+1) — zero
+configuration on any device. To hardcode instead, add a drop-in via
+`systemctl edit elish-btaddr`:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/elish-btaddr.sh YOUR_FACTORY_BT_MAC
+```
+
+Verify: `bluetoothctl show` should list the `elish` controller with
+`Powered: yes`, and `bluetoothctl scan on` finds nearby devices.
+
 ## 5.5 Sensors + A/B slot (optional, strongly recommended)
 
 elish's accelerometer/gyroscope/light/magnetometer are hosted by the SLPI

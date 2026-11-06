@@ -1,0 +1,12 @@
+[Unit]
+Description=Program elish factory Bluetooth address
+After=bluetooth.service mnt-vendor-persist.mount
+Requires=mnt-vendor-persist.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/elish-btaddr.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=bluetooth.target
