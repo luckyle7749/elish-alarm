@@ -270,6 +270,15 @@ Settings → Workspace Behavior → General Behavior → set **Touch Mode to
 "Always enable"**; keep the display's autoRotation at `InTabletMode`
 (effectively permanent tablet).
 
+**Troubleshooting: accel device present but no data.** If `monitor-sensor`
+shows `Has accelerometer` yet orientation/tilt stays `undefined` (while
+`ssccli` streams fine), the QMI subscription is likely stale — after the
+proxy gets SIGKILLed, SLPI keeps a dead subscription and enable requests go
+unanswered. **Don't SIGKILL**: `sudo systemctl restart hexagonrpcd-sdsp
+iio-sensor-proxy` (restarting the daemon lets the DSP notice the dead link);
+reboot if that fails. The repo's proxy drop-in adds
+`After=/Wants=hexagonrpcd-sdsp` for correct ordering.
+
 ## 6. Flash UEFI, first boot
 
 The image is `edk2/boot-elish.img` in this repo (or build your own from

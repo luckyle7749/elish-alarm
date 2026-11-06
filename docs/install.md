@@ -249,6 +249,14 @@ sudo find /mnt/vendor/persist/sensors/registry -type d -exec chmod g+s {} +
 设置 → 工作区行为 → 常规行为 → **触控模式选"总是启用"**;
 显示器配置里 autoRotation 保持 `InTabletMode` 即可（等效于恒平板）。
 
+**排障：accel 有设备但无数据。** 若 `monitor-sensor` 显示
+`Has accelerometer` 但 orientation/tilt 恒为 `undefined`（而 `ssccli`
+有数），多半是 QMI 订阅僵死——proxy 被 SIGKILL 后 SLPI 侧残留了
+死订阅，enable 请求得不到应答。**别 SIGKILL**:
+`sudo systemctl restart hexagonrpcd-sdsp iio-sensor-proxy`（重启 daemon
+让 DSP 感知断链），不行就重启整机。仓库的 proxy drop-in 已加
+`After=/Wants=hexagonrpcd-sdsp` 保证启动顺序。
+
 ## 6. 刷入 UEFI,首启
 
 镜像在仓库 `edk2/boot-elish.img`（或从
