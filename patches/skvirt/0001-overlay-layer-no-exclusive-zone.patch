@@ -20,3 +20,22 @@
  }
  
  void KeyboardWindow::hidePanel()
+--- a/src/qml/main.qml	2026-11-05 15:21:51.000000000 +0800
++++ b/src/qml/main.qml	2026-11-07 16:50:18.655070336 +0800
+@@ -12,12 +12,13 @@
+ 
+         // Grow/shrink the layer-shell window when the suggestion bar appears
+         // or disappears so the bar never covers the key rows. The exclusive
+-        // zone excludes the transient long-press popup reserve so apps are
+-        // not pushed around by a popup.
++        // zone stays 0: the overlay panel floats over apps/panels, never
++        // pushing them (upstream reserved zoneHeight here, which pushed the
++        // Plasma panel up whenever the height changed while visible).
+         onDesiredHeightChanged: {
+             root.updateKeyboardHeight(desiredHeight)
+             if (root.visible)
+-                root.updateExclusiveZone(zoneHeight)
++                root.updateExclusiveZone(0)
+         }
+ 
+         // The panel is exactly as tall as the keyboard it draws, which the
