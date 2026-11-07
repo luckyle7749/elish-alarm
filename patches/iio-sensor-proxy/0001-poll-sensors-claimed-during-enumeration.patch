@@ -1,0 +1,48 @@
+From ee181bd3788724e72294302ecf7e13a64d8ee6d1 Mon Sep 17 00:00:00 2001
+From: Devin <devin@local>
+Date: Sat, 7 Nov 2026 13:59:32 +0800
+Subject: [PATCH] sensors: start polling for clients that claimed during
+ enumeration
+
+iio-sensor-proxy registers its D-Bus object in bus_acquired_handler but
+only enumerates/binds sensors later in name_acquired_handler. Clients
+(e.g. kded watching the D-Bus name for auto-rotation) can claim a sensor
+in that window: the claim is recorded in the clients hash table and
+returned success, but driver_type_exists() is still false so polling is
+never started. The coldplug bind path then attaches the device without
+re-checking the clients table -- unlike the hotplug path, which does --
+leaving the sensor permanently claimed-but-dead ("HasAccelerometer=true",
+orientation undefined) for the life of the process.
+
+Mirror the hotplug path: after devices are opened, start polling for any
+sensor type that already has registered clients.
+---
+ src/iio-sensor-proxy.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/iio-sensor-proxy.c b/src/iio-sensor-proxy.c
+index 9c7e8cd..32bfe8e 100644
+--- a/src/iio-sensor-proxy.c
++++ b/src/iio-sensor-proxy.c
+@@ -784,6 +784,18 @@ name_acquired_handler (GDBusConnection *connection,
+ 	if (!any_sensors_left (data))
+ 		goto bail;
+ 
++	/* Clients may have claimed sensors while device enumeration was still
++	 * running: they sit in the clients hash tables but polling was never
++	 * started for them. Kick it off now that devices are open. */
++	for (i = 0; i < NUM_SENSOR_TYPES; i++) {
++		if (DEVICE_FOR_TYPE(i) &&
++		    g_hash_table_size (data->clients[i]) > 0) {
++			g_debug ("Sensor type %d claimed during enumeration, starting polling", i);
++			data->sensor_startup_dbus_event_delayed[i] = TRUE;
++			driver_set_polling (DEVICE_FOR_TYPE(i), TRUE);
++		}
++	}
++
+ 	send_dbus_event (data, PROP_ALL);
+ 	send_dbus_event (data, PROP_ALL_COMPASS);
+ 	return;
+-- 
+2.56.0
+

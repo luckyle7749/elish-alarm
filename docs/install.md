@@ -253,7 +253,8 @@ sudo systemctl enable --now hexagonrpcd-sdsp qbootctl iio-sensor-proxy
 | `61-libssc.rules` | 给 fastrpc 设备打 `IIO_SENSOR_PROXY_TYPE` 标签(iio-sensor-proxy 的 accel 驱动靠它认领设备)+ `ACCEL_MOUNT_MATRIX` 挂载矩阵 |
 | `qbootctl.service` | 每次开机把当前槽位标 successful——不标的话启动计数扣完，bootloader 会**自动切回 Android 槽位** |
 | fstab `persist` 行 | SLPI 要读写 `/mnt/vendor/persist/sensors` 校准数据；没挂载 = 崩溃循环复发 |
-| `hexagonrpcd-sdsp` drop-in | `Restart=always`——daemon 会偶发**干净退出**(status 0，运行数十分钟后),systemd 视其为"完成"不再拉起，随后 SLPI 看门狗崩溃循环、传感器静默全灭(报错都指向别处，极难排查)。必须让它死必复活 |
+| `hexagonrpcd-sdsp` drop-in `restart.conf` | `Restart=always`——daemon 会偶发**干净退出**(status 0，运行数十分钟后),systemd 视其为"完成"不再拉起，随后 SLPI 看门狗崩溃循环、传感器静默全灭(报错都指向别处，极难排查)。必须让它死必复活 |
+| `hexagonrpcd-sdsp` drop-in `persist-perms.conf` | **安卓每次启动都会把注册表属主重置回安卓用户**,daemon(fastrpc 组）随即写不进去。此 drop-in 在 daemon 每次启动前以 root 自动 `chgrp fastrpc + g+rw`——双系统来回切也免疫 |
 | `iio-sensor-proxy` drop-in | 保险丝:传感器栈异常时(如 persist 未挂载、守护未起)代理会停不下来,把关机等待从默认 90s 压到 10s;栈正常时它不参与任何功能 |
 
 挂载后**还要修一次权限**——persist 里的传感器注册表属主是安卓
@@ -266,7 +267,9 @@ sudo chmod -R g+rw /mnt/vendor/persist/sensors/registry
 sudo find /mnt/vendor/persist/sensors/registry -type d -exec chmod g+s {} +
 ```
 
-（只动组不动属主，安卓侧不受影响；setgid 让后续新文件继承 fastrpc 组）
+（只动组不动属主，安卓侧不受影响；setgid 让后续新文件继承 fastrpc 组。
+此后每次 Arch 启动由 `persist-perms.conf` drop-in 自动纠偏——**安卓
+每启一次就重置一次属主**，手动修只能管当次启动）
 
 ⚠️ 挂载矩阵**已实测标定**：仓库用 `"-1, 0, 0; 0, -1, 0; 0, 0, 1"`
 (X/Y 取反、Z 不变）——postmarketOS 的三轴全取反矩阵在这台机器上
@@ -277,13 +280,48 @@ sudo find /mnt/vendor/persist/sensors/registry -type d -exec chmod g+s {} +
 设置 → 工作区行为 → 常规行为 → **触控模式选"总是启用"**;
 显示器配置里 autoRotation 保持 `InTabletMode` 即可（等效于恒平板）。
 
-**排障：accel 有设备但无数据。** 若 `monitor-sensor` 显示
+**iio-sensor-proxy 上游竞态 bug(必须打补丁,否则旋转大概率失灵)。**
+3.9 版里 proxy 先注册 D-Bus 对象、后枚举传感器(SSC 枚举约 1 秒,
+每颗传感器一轮 QMI 对话)。KDE 在 D-Bus 名字出现瞬间 claim
+accelerometer——每次都抢在枚举完成前：claim 被记入客户端表并返回
+成功，但此时设备尚未绑定，polling 从不启动；随后冷插拔绑定路径
+**不检查客户端表、不补 polling**(热插拔路径会，冷插拔漏了)，
+表现为 `Has accelerometer` 但 orientation/tilt 恒 `undefined`。
+仓库含补丁 `patches/iio-sensor-proxy/0001-poll-sensors-claimed-during-enumeration.patch`
+(枚举完成后补查客户端表并启动 polling)，应用方法:
+
+```sh
+git clone --depth 1 -b 3.9 https://gitlab.freedesktop.org/hadess/iio-sensor-proxy.git
+cd iio-sensor-proxy
+patch -p1 < /path/to/0001-poll-sensors-claimed-during-enumeration.patch
+meson setup build -Dssc-support=enabled   # auto 模式不会编译 SSC 驱动
+ninja -C build
+sudo systemctl stop iio-sensor-proxy
+sudo cp build/src/iio-sensor-proxy /usr/lib/iio-sensor-proxy
+sudo systemctl start iio-sensor-proxy
+```
+
+补丁是被覆盖的二进制，**pacman 升级会还原它**——冻结此包直到上游
+合并（补丁方向与热插拔路径已有逻辑一致，适合提 MR):
+
+```sh
+# /etc/pacman.conf
+IgnorePkg = iio-sensor-proxy
+```
+
+验证修复生效：`journalctl -u iio-sensor-proxy` 里应出现
+`claimed during enumeration, starting polling` 与
+`Enabling sensor ... continuous`。
+
+**排障：accel 有设备但无数据的其他原因。** `monitor-sensor` 显示
 `Has accelerometer` 但 orientation/tilt 恒为 `undefined`（而 `ssccli`
-有数），多半是 QMI 订阅僵死——proxy 被 SIGKILL 后 SLPI 侧残留了
-死订阅，enable 请求得不到应答。**别 SIGKILL**:
+有数），除上述竞态外还可能是 QMI 订阅僵死——proxy 被 SIGKILL 后 SLPI
+侧残留死订阅，enable 请求得不到应答。**别 SIGKILL**:
 `sudo systemctl restart hexagonrpcd-sdsp iio-sensor-proxy`（重启 daemon
 让 DSP 感知断链），不行就重启整机。仓库的 proxy drop-in 已加
 `After=/Wants=hexagonrpcd-sdsp` 保证启动顺序。
+诊断时可给 proxy 开调试日志：`systemctl edit iio-sensor-proxy`
+写入 `[Service]` 段加 `Environment=G_MESSAGES_DEBUG=all`。
 
 ⚠️ **休眠(suspend)目前不可用**:s2idle 唤醒后 QMI/传感器订阅状态
 不可恢复——SLPI 崩溃循环复发，且重启 daemon/proxy、重置 remoteproc

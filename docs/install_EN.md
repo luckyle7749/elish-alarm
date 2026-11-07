@@ -272,7 +272,8 @@ sudo systemctl enable --now hexagonrpcd-sdsp qbootctl iio-sensor-proxy
 | `61-libssc.rules` | Tags fastrpc devices with `IIO_SENSOR_PROXY_TYPE` (the proxy's accel driver claims devices by this tag) + `ACCEL_MOUNT_MATRIX` |
 | `qbootctl.service` | Marks the current slot successful every boot — without it the retry counter runs out and the bootloader **flips back to the Android slot** |
 | fstab `persist` line | SLPI reads/writes `/mnt/vendor/persist/sensors` calibration data; unmounted = crash loop returns |
-| `hexagonrpcd-sdsp` drop-in | `Restart=always` — the daemon occasionally **exits cleanly** (status 0, after tens of minutes); systemd treats that as "done" and never restarts it, then the SLPI watchdog crash-loops and all sensors silently die (the errors point elsewhere — very hard to trace). It must come back every time |
+| `hexagonrpcd-sdsp` drop-in `restart.conf` | `Restart=always` — the daemon occasionally **exits cleanly** (status 0, after tens of minutes); systemd treats that as "done" and never restarts it, then the SLPI watchdog crash-loops and all sensors silently die (the errors point elsewhere — very hard to trace). It must come back every time |
+| `hexagonrpcd-sdsp` drop-in `persist-perms.conf` | **Every Android boot re-owns the sensor registry to the Android user**, after which the daemon (fastrpc group) can't write it. This drop-in runs `chgrp fastrpc + g+rw` as root before each daemon start — immune to Android/Arch switching |
 | `iio-sensor-proxy` drop-in | A fuse: if the sensor stack misbehaves (persist unmounted, daemons missing) the proxy stops responding and stalls shutdown for the default 90s — this caps it at 10s; does nothing when the stack is healthy |
 
 After mounting, **fix permissions once** — the sensor registry in persist is
@@ -287,7 +288,9 @@ sudo find /mnt/vendor/persist/sensors/registry -type d -exec chmod g+s {} +
 ```
 
 (changes group only, owner untouched — Android unaffected; setgid makes new
-files inherit the fastrpc group)
+files inherit the fastrpc group. From then on the `persist-perms.conf`
+drop-in repairs it on every Arch boot — **Android resets the owner every
+time it boots**, so a one-off manual fix only lasts until the next switch)
 
 ⚠️ The mount matrix **is calibrated on real hardware**: the repo uses
 `"-1, 0, 0; 0, -1, 0; 0, 0, 1"` (X/Y negated, Z kept) — postmarketOS's
@@ -300,14 +303,55 @@ Settings → Workspace Behavior → General Behavior → set **Touch Mode to
 "Always enable"**; keep the display's autoRotation at `InTabletMode`
 (effectively permanent tablet).
 
-**Troubleshooting: accel device present but no data.** If `monitor-sensor`
-shows `Has accelerometer` yet orientation/tilt stays `undefined` (while
-`ssccli` streams fine), the QMI subscription is likely stale — after the
-proxy gets SIGKILLed, SLPI keeps a dead subscription and enable requests go
-unanswered. **Don't SIGKILL**: `sudo systemctl restart hexagonrpcd-sdsp
-iio-sensor-proxy` (restarting the daemon lets the DSP notice the dead link);
-reboot if that fails. The repo's proxy drop-in adds
-`After=/Wants=hexagonrpcd-sdsp` for correct ordering.
+**iio-sensor-proxy upstream race bug (patch required, or rotation very
+likely fails).** In 3.9 the proxy registers its D-Bus object first and
+enumerates sensors later (SSC enumeration takes ~1s, one QMI round-trip
+per sensor). KDE claims the accelerometer the instant the D-Bus name
+appears — always before enumeration finishes: the claim is recorded in
+the clients table and returns success, but with the device not yet bound,
+polling never starts; the coldplug bind path **does not re-check the
+clients table** (the hotplug path does — coldplug was missed), leaving
+`Has accelerometer` with orientation/tilt stuck at `undefined`.
+The repo ships the patch
+`patches/iio-sensor-proxy/0001-poll-sensors-claimed-during-enumeration.patch`
+(re-checks the clients table after enumeration and starts polling). Apply
+it like this:
+
+```sh
+git clone --depth 1 -b 3.9 https://gitlab.freedesktop.org/hadess/iio-sensor-proxy.git
+cd iio-sensor-proxy
+patch -p1 < /path/to/0001-poll-sensors-claimed-during-enumeration.patch
+meson setup build -Dssc-support=enabled   # auto mode skips the SSC drivers
+ninja -C build
+sudo systemctl stop iio-sensor-proxy
+sudo cp build/src/iio-sensor-proxy /usr/lib/iio-sensor-proxy
+sudo systemctl start iio-sensor-proxy
+```
+
+The patch replaces a package-owned binary — **pacman upgrades will revert
+it**. Freeze the package until upstream merges (the patch mirrors existing
+hotplug-path logic, so it's MR-worthy):
+
+```sh
+# /etc/pacman.conf
+IgnorePkg = iio-sensor-proxy
+```
+
+Verify the fix took: `journalctl -u iio-sensor-proxy` should show
+`claimed during enumeration, starting polling` and
+`Enabling sensor ... continuous`.
+
+**Troubleshooting: other causes of accel-present-but-no-data.** If
+`monitor-sensor` shows `Has accelerometer` yet orientation/tilt stays
+`undefined` (while `ssccli` streams fine), besides the race above the QMI
+subscription may be stale — after the proxy gets SIGKILLed, SLPI keeps a
+dead subscription and enable requests go unanswered. **Don't SIGKILL**:
+`sudo systemctl restart hexagonrpcd-sdsp iio-sensor-proxy` (restarting the
+daemon lets the DSP notice the dead link); reboot if that fails. The
+repo's proxy drop-in adds `After=/Wants=hexagonrpcd-sdsp` for correct
+ordering. For debugging, enable verbose proxy logs via
+`systemctl edit iio-sensor-proxy` with `[Service]` and
+`Environment=G_MESSAGES_DEBUG=all`.
 
 ⚠️ **Suspend is currently broken**: after s2idle resume the QMI/sensor
 subscription state is unrecoverable — the SLPI crash loop returns, and
