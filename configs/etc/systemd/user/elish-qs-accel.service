@@ -1,0 +1,10 @@
+[Unit]
+Description=Rebuild plasma quicksettings if the accelerometer arrived late
+After=plasma-plasmashell.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/elish-qs-wait-accel.sh
+
+[Install]
+WantedBy=plasma-workspace.target
