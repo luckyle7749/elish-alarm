@@ -1,0 +1,1 @@
+ACTION=="add|change", SUBSYSTEM=="input", ENV{ID_USB_VENDOR_ID}=="3206", ENV{ID_USB_MODEL_ID}=="3ffc", TAG+="kwin-ignore-tablet-mode"

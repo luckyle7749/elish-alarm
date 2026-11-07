@@ -274,6 +274,8 @@ sudo systemctl enable --now hexagonrpcd-sdsp qbootctl iio-sensor-proxy
 | fstab `persist` line | SLPI reads/writes `/mnt/vendor/persist/sensors` calibration data; unmounted = crash loop returns |
 | `hexagonrpcd-sdsp` drop-in `restart.conf` | `Restart=always` — the daemon occasionally **exits cleanly** (status 0, after tens of minutes); systemd treats that as "done" and never restarts it, then the SLPI watchdog crash-loops and all sensors silently die (the errors point elsewhere — very hard to trace). It must come back every time |
 | `hexagonrpcd-sdsp` drop-in `persist-perms.conf` | **Every Android boot re-owns the sensor registry to the Android user**, after which the daemon (fastrpc group) can't write it. This drop-in runs `chgrp fastrpc + g+rw` as root before each daemon start — immune to Android/Arch switching |
+| `75-elish-ignore-tablet-mode.rules` (plasma-mobile only) | The pogo keyboard controller (`3206:3ffc`) always enumerates mouse/touchpad interfaces, making KWin decide "not a tablet" → auto-rotation never engages. The `kwin-ignore-tablet-mode` tag removes it from the check |
+| `49-sensor-proxy-claim.rules` (plasma-mobile only) | polkit only allows sensor claims from the active seat session; early-login claims hit the still-active greeter and get denied. Unconditionally allow, preventing random loss of rotation or its UI toggle |
 | `iio-sensor-proxy` drop-in | A fuse: if the sensor stack misbehaves (persist unmounted, daemons missing) the proxy stops responding and stalls shutdown for the default 90s — this caps it at 10s; does nothing when the stack is healthy |
 
 After mounting, **fix permissions once** — the sensor registry in persist is
@@ -361,6 +363,43 @@ full reboot recovers. Recommend masking it and using screen-off only:
 ```sh
 sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 ```
+
+### Plasma Mobile auto-rotation (optional session)
+
+`pacman -S plasma-mobile` adds a Plasma Mobile session to the login manager
+(it coexists with desktop Plasma; layouts don't interfere). Mobile rotation
+depends entirely on KWin's tablet-mode detection, and this device has two
+hardware quirks that must be fixed or rotation dies:
+
+**The pogo keyboard controller fakes a mouse (required).** The keyboard
+connector's USB controller (Xiaomi `3206:3ffc`) always enumerates
+keyboard+mouse+touchpad HID interfaces, whether or not a keyboard is
+attached. KWin computes `isTablet = hasTouch && !hasPointer` — this phantom
+pointer makes it permanently "laptop", tablet mode never engages, and the
+auto-rotate pipeline never starts. Install
+`configs/etc/udev/rules.d/75-elish-ignore-tablet-mode.rules` to tag that
+VID:PID with `kwin-ignore-tablet-mode` (KWin's built-in opt-out tag), then
+`udevadm control --reload` and log in again. Afterwards
+`busctl --user get-property org.kde.KWin /org/kde/KWin
+org.kde.KWin.TabletModeManager tabletMode` should return `true`.
+
+**Early polkit claim denial (insurance).** KWin and the mobile shell may
+call `ClaimAccelerometer` before the session is active, but polkit only
+permits the "active session on the seat" — while the greeter session still
+holds the seat, claims get `AccessDenied` and clients never retry. Symptoms
+are random (rotation or the control-center rotate toggle disappears). Install
+`configs/etc/polkit-1/rules.d/49-sensor-proxy-claim.rules` to unconditionally
+allow that action (claiming only turns sensors on; no security impact).
+
+**Config traps to avoid:**
+
+- `kwinrc [Input] TabletMode=on` **does not work** — KWin reads the key with
+  `readPathEntry`, which expands the relative value into `$HOME/on` so it
+  never matches `"on"` (probable upstream bug). With the udev tag, `auto`
+  ("on demand") already works; forced On is unnecessary.
+- Editing `autoRotation` in `kwinoutputconfig.json` gets overwritten by
+  KWin's in-memory state; change the policy only via System Settings →
+  Display's "auto-rotate" dropdown.
 
 ## 6. Flash UEFI, first boot
 

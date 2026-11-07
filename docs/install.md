@@ -255,6 +255,8 @@ sudo systemctl enable --now hexagonrpcd-sdsp qbootctl iio-sensor-proxy
 | fstab `persist` 行 | SLPI 要读写 `/mnt/vendor/persist/sensors` 校准数据；没挂载 = 崩溃循环复发 |
 | `hexagonrpcd-sdsp` drop-in `restart.conf` | `Restart=always`——daemon 会偶发**干净退出**(status 0，运行数十分钟后),systemd 视其为"完成"不再拉起，随后 SLPI 看门狗崩溃循环、传感器静默全灭(报错都指向别处，极难排查)。必须让它死必复活 |
 | `hexagonrpcd-sdsp` drop-in `persist-perms.conf` | **安卓每次启动都会把注册表属主重置回安卓用户**,daemon(fastrpc 组）随即写不进去。此 drop-in 在 daemon 每次启动前以 root 自动 `chgrp fastrpc + g+rw`——双系统来回切也免疫 |
+| `75-elish-ignore-tablet-mode.rules`(plasma-mobile 才装） | pogo 键盘主控（`3206:3ffc`）常驻枚举鼠标/触摸板,KWin 据此判"非平板"→自动旋转永不激活。打 `kwin-ignore-tablet-mode` tag 让它退出判定 |
+| `49-sensor-proxy-claim.rules`(plasma-mobile 才装） | polkit 默认只放行座位活动会话的 sensor claim；登录早期 claim 必撞 greeter 未退场窗口被拒。无条件放行，防旋转/旋转按钮随机消失 |
 | `iio-sensor-proxy` drop-in | 保险丝:传感器栈异常时(如 persist 未挂载、守护未起)代理会停不下来,把关机等待从默认 90s 压到 10s;栈正常时它不参与任何功能 |
 
 挂载后**还要修一次权限**——persist 里的传感器注册表属主是安卓
@@ -330,6 +332,37 @@ IgnorePkg = iio-sensor-proxy
 ```sh
 sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 ```
+
+### Plasma Mobile 自动旋转（可选桌面会话）
+
+`pacman -S plasma-mobile` 后登录器会多出 Plasma Mobile 会话（与桌面 Plasma
+共存，布局互不影响）。移动端旋转全靠 KWin 的平板判定，本机有两个硬件怪癖
+必须修，否则旋转必死：
+
+**pogo 键盘主控冒充鼠标（必修）。** 键盘触点的 USB 主控芯片
+（Xiaomi `3206:3ffc`）无论插不插键盘都常驻枚举 keyboard+mouse+touchpad
+三个 HID 接口。KWin 判定 `isTablet = 有触摸 && 无指针设备`——这颗假指针
+让判定永远为"笔记本"，平板模式永不激活，自动旋转整个链路不启动。安装
+`configs/etc/udev/rules.d/75-elish-ignore-tablet-mode.rules` 给该 VID:PID
+打 `kwin-ignore-tablet-mode` tag（KWin 官方预留的忽略标记），然后
+`udevadm control --reload` 并重新登录。生效后
+`busctl --user get-property org.kde.KWin /org/kde/KWin
+org.kde.KWin.TabletModeManager tabletMode` 应为 `true`。
+
+**polkit 早期 claim 被拒（保险丝）。** KWin/移动 shell 在会话激活前就可能
+`ClaimAccelerometer`，而 polkit 默认只放行"座位上的活动会话"——greeter
+会话还没退场时 claim 一律 `AccessDenied` 且客户端不重试，症状随机（旋转
+或控制中心的旋转按钮任一消失）。安装
+`configs/etc/polkit-1/rules.d/49-sensor-proxy-claim.rules` 对该 action
+无条件放行（claim 只是开传感器，无安全影响）。
+
+**别踩的配置坑：**
+
+- `kwinrc [Input] TabletMode=on` **无效**——KWin 用 `readPathEntry` 读该键，
+  相对路径会被展开成 `$HOME/on`，永远匹配不上 `"on"`（疑似上游 bug）。
+  有 udev tag 后 `auto`（按需启用）本身就工作，不需要强制 On。
+- 直接编辑 `kwinoutputconfig.json` 里的 `autoRotation` 会被 KWin 内存态
+  覆写，想改策略只能走系统设置→显示 里的"自动旋转"下拉。
 
 ## 6. 刷入 UEFI,首启
 
