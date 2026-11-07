@@ -415,6 +415,9 @@ sudo ninja -C build install   # KCM 设置面板(可选)
 | `configs/home/.config/autostart/org.fcitx.Fcitx5.desktop` | 屏蔽 XDG autostart 抢跑的"裸奔" fcitx5——它没有 IM 权限反而挡路；KWin 会经 `fcitx5-wayland-launcher` 正规拉起 |
 | `configs/home/.config/autostart/skvirt.desktop` | 会话自启动 |
 | `configs/home/.config/skvirtrc` | `showAutosuggestions=false` 关掉 skvirt 自带 libime 拼音条，只留 Rime 候选窗（两条会同时出现） |
+| `configs/home/.config/fcitx5/profile` | 输入法组：`keyboard-us` + `rime`，默认 `rime`——不装这个 fcitx5 只有英文键盘 |
+| `configs/home/.config/fcitx5/config` | 快捷键：`Super+Space` 激活/关闭输入法（物理键盘按 Windows 习惯切输入法） |
+| `configs/home/.local/share/fcitx5/rime/default.custom.yaml` | Rime 选用 `rime_ice_suggestion`（雾凇方案预设），配合 `rime-ice-git` 包 |
 
 **行为说明**:skvirt 是 layer-shell 面板，钉在屏幕底部，**不支持
 拖动**（协议限定，所有 OSK 皆然）。设置项在 系统设置→skvirt KCM
