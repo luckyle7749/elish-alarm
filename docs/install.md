@@ -365,6 +365,60 @@ org.kde.KWin.TabletModeManager tabletMode` 应为 `true`。
 - 直接编辑 `kwinoutputconfig.json` 里的 `autoRotation` 会被 KWin 内存态
   覆写，想改策略只能走系统设置→显示 里的"自动旋转"下拉。
 
+### 屏幕虚拟键盘（Fcitx5/Rime 可用）
+
+**为什么 plasma-keyboard 不行。** Plasma 自带的 `plasma-keyboard` 必须
+独占 Wayland `input-method` 槽位，而该槽位已分配给 Fcitx5
+（`kwinrc [Wayland] InputMethod`）。强启会报 `Cannot run
+plasma-keyboard standalone` 并崩溃（Qt 6.12 下其 Breeze 样式插件另有
+堆损坏 bug)。squeekboard 等走 `zwp_virtual_keyboard_v1` 的键盘
+也不行——KWin 6.8 未实现该协议。
+
+**方案：skvirt**(<https://github.com/Vendetta1871/skvirt>)。它用
+`/dev/uinput` 创建内核虚拟键盘，按键走 libinput→KWin→Fcitx5 正常
+输入管线——不占 IM 槽位，Fcitx5 无感知，Rime/雾凇词库原生工作，
+候选词在 Fcitx5 自己的候选窗中弹出。触摸聚焦文本框自动弹出。
+
+**构建安装**（仓库 `patches/skvirt/` 下有 3 个本地补丁）:
+
+```sh
+sudo pacman -S --needed cmake extra-cmake-modules ninja boost \
+    kirigami ki18n kconfig kcoreaddons kcmutils libime hunspell \
+    qt6-multimedia layer-shell-qt qt6-declarative
+git clone https://github.com/Vendetta1871/skvirt
+cd skvirt
+git am /path/to/elish-alarm/patches/skvirt/*.patch   # 见下
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja -C build
+sudo install -m755 build/skvirt /usr/local/bin/skvirt
+sudo ninja -C build install   # KCM 设置面板(可选)
+```
+
+**本仓库的 3 个补丁**(`git am` 逐个应用，或直接 `patch -p1`):
+
+- `0001-overlay-layer-no-exclusive-zone.patch`:`LayerTop`→`LayerOverlay`
+  （修被开始菜单/启动器盖住），独占区改为 0（修把任务栏顶起来）。
+- `0002-windows-style-bottom-row.patch`：底行由 macOS 的 `⌃⌥⌘` 改为
+  Windows 布局 `Ctrl Win Alt`。
+- `0003-hide-on-physical-keyboard.patch`:InputMonitor 新增键盘设备
+  识别——物理键盘（pogo/蓝牙/USB)**接入或按键即收起** OSK；触摸
+  仍弹出，鼠标活动仍按 `hideOnMouseMove` 收起。排除自身 uinput
+  设备防止自触发。
+
+**系统配置**（仓库已带，照抄路径）:
+
+| 文件 | 作用 |
+|---|---|
+| `configs/etc/udev/rules.d/80-uinput-input.rules` | `/dev/uinput` 归 `input` 组；用户加入 input 组（`sudo usermod -aG input <user>`)后免 root 创建虚拟键盘、读 evdev |
+| `configs/home/.config/autostart/org.fcitx.Fcitx5.desktop` | 屏蔽 XDG autostart 抢跑的"裸奔" fcitx5——它没有 IM 权限反而挡路；KWin 会经 `fcitx5-wayland-launcher` 正规拉起 |
+| `configs/home/.config/autostart/skvirt.desktop` | 会话自启动 |
+| `configs/home/.config/skvirtrc` | `showAutosuggestions=false` 关掉 skvirt 自带 libime 拼音条，只留 Rime 候选窗（两条会同时出现） |
+
+**行为说明**:skvirt 是 layer-shell 面板，钉在屏幕底部，**不支持
+拖动**（协议限定，所有 OSK 皆然）。设置项在 系统设置→skvirt KCM
+或 `skvirtrc`：`showOnlyInTabletMode`、`hideOnMouseMove`、
+`functionRow`、`longPressSymbols`、`theme`、语音输入等。
+
 ## 6. 刷入 UEFI,首启
 
 镜像在仓库 `edk2/boot-elish.img`（或从

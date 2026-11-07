@@ -402,6 +402,63 @@ allow that action (claiming only turns sensors on; no security impact).
   KWin's in-memory state; change the policy only via System Settings →
   Display's "auto-rotate" dropdown.
 
+### On-screen virtual keyboard (works with Fcitx5/Rime)
+
+**Why plasma-keyboard doesn't work.** Plasma's `plasma-keyboard` must own
+the Wayland `input-method` slot — already assigned to Fcitx5
+(`kwinrc [Wayland] InputMethod`). Force-launching prints `Cannot run
+plasma-keyboard standalone` and crashes (its Breeze style plugin also
+heap-corrupts on Qt 6.12). squeekboard-style keyboards using
+`zwp_virtual_keyboard_v1` are out too — KWin 6.8 doesn't implement it.
+
+**Solution: skvirt** (<https://github.com/Vendetta1871/skvirt>). It creates
+a kernel virtual keyboard via `/dev/uinput`; keystrokes flow through
+libinput → KWin → Fcitx5 like a physical keyboard — no IM slot needed,
+Fcitx5 is oblivious, Rime + rime-ice work natively, candidates appear in
+Fcitx5's own popup. Touch-focusing a text field raises it automatically.
+
+**Build & install** (3 local patches live in `patches/skvirt/`):
+
+```sh
+sudo pacman -S --needed cmake extra-cmake-modules ninja boost \
+    kirigami ki18n kconfig kcoreaddons kcmutils libime hunspell \
+    qt6-multimedia layer-shell-qt qt6-declarative
+git clone https://github.com/Vendetta1871/skvirt
+cd skvirt
+git am /path/to/elish-alarm/patches/skvirt/*.patch   # see below
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja -C build
+sudo install -m755 build/skvirt /usr/local/bin/skvirt
+sudo ninja -C build install   # KCM settings module (optional)
+```
+
+**This repo's 3 patches** (apply with `git am` or `patch -p1`):
+
+- `0001-overlay-layer-no-exclusive-zone.patch`: `LayerTop`→`LayerOverlay`
+  (fixes the app launcher covering it) and exclusive zone → 0 (fixes it
+  pushing the taskbar up).
+- `0002-windows-style-bottom-row.patch`: bottom row from macOS `⌃⌥⌘` to
+  Windows-style `Ctrl Win Alt`.
+- `0003-hide-on-physical-keyboard.patch`: InputMonitor learns keyboard
+  devices — connecting **or pressing** a physical keyboard (pogo/BT/USB)
+  hides the OSK; touch still raises it, pointer activity still hides per
+  `hideOnMouseMove`. Its own uinput device is excluded to prevent
+  self-triggering.
+
+**System config** (shipped in this repo):
+
+| File | Purpose |
+|---|---|
+| `configs/etc/udev/rules.d/80-uinput-input.rules` | `/dev/uinput` owned by `input` group; add the user (`sudo usermod -aG input <user>`) for rootless virtual-keyboard + evdev access |
+| `configs/home/.config/autostart/org.fcitx.Fcitx5.desktop` | Masks the XDG-autostart fcitx5 that runs without IM permission and gets in the way; KWin launches it properly via `fcitx5-wayland-launcher` |
+| `configs/home/.config/autostart/skvirt.desktop` | Session autostart |
+| `configs/home/.config/skvirtrc` | `showAutosuggestions=false` kills skvirt's own libime pinyin bar (both bars would show) leaving only Rime candidates |
+
+**Behavior notes:** skvirt is a layer-shell panel pinned to the screen
+bottom — **no dragging** (protocol limit, true of all OSKs). Settings live
+in System Settings → skvirt KCM or `skvirtrc`: `showOnlyInTabletMode`,
+`hideOnMouseMove`, `functionRow`, `longPressSymbols`, `theme`, voice input.
+
 ## 6. Flash UEFI, first boot
 
 The image is `edk2/boot-elish.img` in this repo (or build your own from

@@ -1,0 +1,25 @@
+--- a/src/qml/SkvirtKeyboard.qml	2026-11-05 15:21:51.000000000 +0800
++++ b/src/qml/SkvirtKeyboard.qml	2026-11-07 16:34:36.457022362 +0800
+@@ -37,16 +37,15 @@
+         ["f11","F11","",1.125,"","c"], ["f12","F12","",1.125,"","c"]
+     ]
+ 
+-    // The Mac bottom row. 🌐 is the input-source key: it cycles the fcitx IM,
+-    // so its small label is the active layout code.
++    // Windows-style bottom row. 🌐 cycles the fcitx IM.
+     readonly property var bottomRowData: [
+         ["lang", "🌐", "", 1, KeyboardController.layoutLabel, "c"],
+-        ["control", "⌃", "", 1, "control", "l"],
+-        ["option", "⌥", "", 1, "option", "l"],
+-        ["command", "⌘", "", 1.25, "command", "l"],
++        ["control", "Ctrl", "", 1, "ctrl", "l"],
++        ["command", "Win", "", 1.25, "super", "l"],
++        ["option", "Alt", "", 1, "alt", "l"],
+         ["space", "", "", 5.5, "", "c"],
+-        ["command", "⌘", "", 1.25, "command", "r"],
+-        ["option", "⌥", "", 1, "option", "r"],
++        ["option", "Alt", "", 1, "alt", "r"],
++        ["control", "Ctrl", "", 1, "ctrl", "r"],
+         ["left", "◀", "", 1, "", "c"],
+         ["updown", "", "", 1, "", "c"],
+         ["right", "▶", "", 1, "", "c"]

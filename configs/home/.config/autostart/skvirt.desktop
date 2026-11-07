@@ -1,0 +1,17 @@
+[Desktop Entry]
+Comment=skvirt on-screen keyboard
+Exec=/usr/local/bin/skvirt
+GenericName=
+Icon=input-keyboard-virtual
+MimeType=
+Name=skvirt
+NoDisplay=true
+OnlyShowIn=KDE
+Path=
+StartupNotify=false
+Terminal=false
+TerminalOptions=
+Type=Application
+X-KDE-StartupNotify=false
+X-KDE-SubstituteUID=false
+X-KDE-Username=

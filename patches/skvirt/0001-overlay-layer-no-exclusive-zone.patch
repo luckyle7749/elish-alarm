@@ -1,0 +1,22 @@
+--- a/src/KeyboardWindow.cpp	2026-11-05 15:21:51.000000000 +0800
++++ b/src/KeyboardWindow.cpp	2026-11-07 16:34:36.421790588 +0800
+@@ -34,8 +34,8 @@
+     anchors |= LayerShellQt::Window::AnchorRight;
+     lsw->setAnchors(anchors);
+ 
+-    // LayerTop: above normal windows, below system overlays (notifications, etc.)
+-    lsw->setLayer(LayerShellQt::Window::LayerTop);
++    // LayerOverlay: above everything incl. app launcher; exclusive zone stays 0
++    lsw->setLayer(LayerShellQt::Window::LayerOverlay);
+ 
+     // CRITICAL: do not steal keyboard focus — the text input target must stay
+     // in the application behind us so key events are committed there.
+@@ -82,7 +82,7 @@
+     if (isVisible())
+         return;
+     setVisible(true);
+-    updateExclusiveZone(height());
++    updateExclusiveZone(0);
+ }
+ 
+ void KeyboardWindow::hidePanel()
