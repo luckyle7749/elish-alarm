@@ -257,6 +257,7 @@ sudo systemctl enable --now hexagonrpcd-sdsp qbootctl iio-sensor-proxy
 | `hexagonrpcd-sdsp` drop-in `persist-perms.conf` | **安卓每次启动都会把注册表属主重置回安卓用户**,daemon(fastrpc 组）随即写不进去。此 drop-in 在 daemon 每次启动前以 root 自动 `chgrp fastrpc + g+rw`——双系统来回切也免疫 |
 | `75-elish-ignore-tablet-mode.rules`(plasma-mobile 才装） | pogo 键盘主控（`3206:3ffc`）常驻枚举鼠标/触摸板,KWin 据此判"非平板"→自动旋转永不激活。打 `kwin-ignore-tablet-mode` tag 让它退出判定 |
 | `49-sensor-proxy-claim.rules`(plasma-mobile 才装） | polkit 默认只放行座位活动会话的 sensor claim；登录早期 claim 必撞 greeter 未退场窗口被拒。无条件放行，防旋转/旋转按钮随机消失 |
+| `elish-qs-accel.service` + `elish-qs-wait-accel.sh`(plasma-mobile 才装，user 单元） | 快捷面板模型建列表时把"不可用"的插件**永久滤掉**，而 hexagonrpcd 初始化要 ~55s，面板几乎必然抢在 accel 前。此服务轮询 accel；若抢输了等就绪后重启一次 plasmashell 重建模型，抢赢则零打扰 |
 | `iio-sensor-proxy` drop-in | 保险丝:传感器栈异常时(如 persist 未挂载、守护未起)代理会停不下来,把关机等待从默认 90s 压到 10s;栈正常时它不参与任何功能 |
 
 挂载后**还要修一次权限**——persist 里的传感器注册表属主是安卓
