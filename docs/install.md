@@ -401,9 +401,11 @@ sudo ninja -C build install   # KCM 设置面板(可选)
 - `0002-windows-style-bottom-row.patch`：底行由 macOS 的 `⌃⌥⌘` 改为
   Windows 布局 `Ctrl Win Alt`。
 - `0003-hide-on-physical-keyboard.patch`:InputMonitor 新增键盘设备
-  识别——物理键盘（pogo/蓝牙/USB)**接入或按键即收起** OSK；触摸
-  仍弹出，鼠标活动仍按 `hideOnMouseMove` 收起。排除自身 uinput
-  设备防止自触发。
+  识别与存在性跟踪——物理键盘（蓝牙/USB)**接入期间 OSK 完全抑制**,
+  拔掉才恢复触摸弹出；任何键盘设备（含 pogo 常驻键盘接口）的真实
+  按键也会即时收起。带字母键的设备优先判为键盘（R65 等蓝牙键盘
+  附带 REL 轴不会被误分为鼠标）;pogo 常驻键盘接口标为 phantom
+  不计入存在性；排除自身 uinput 设备防止自触发。
 
 **系统配置**（仓库已带，照抄路径）:
 

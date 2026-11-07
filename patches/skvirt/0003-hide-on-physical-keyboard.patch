@@ -1,20 +1,37 @@
 --- a/src/InputMonitor.h	2026-11-05 15:21:51.000000000 +0800
-+++ b/src/InputMonitor.h	2026-11-07 16:38:44.056112263 +0800
-@@ -28,9 +28,11 @@
++++ b/src/InputMonitor.h	2026-11-07 16:47:59.189874161 +0800
+@@ -23,15 +23,21 @@
+ 
+     bool hasTouchscreen() const { return m_hasTouch; }
+     bool tabletMode() const { return m_tabletMode; }
++    bool hasPhysicalKeyboard() const { return m_keyboards > 0; }
+ 
+ signals:
      void touchActivity();    // finger/pen went down on a direct (touchscreen) device
      void pointerActivity();  // mouse/touchpad/trackpoint moved or clicked
      void tabletModeChanged(bool tabletMode);  // SW_TABLET_MODE switch flipped
-+    void keyboardAttached();   // a physical keyboard-ish evdev device appeared
 +    void keyboardActivity();   // a physical key was pressed
++    void physicalKeyboardPresent(bool present);  // keyboard count 0<->1
  
  private:
 -    enum Kind { Ignore, Touch, Pointer, Switch };
+-    struct Dev { int fd; Kind kind; QSocketNotifier *notifier; QString path; };
 +    enum Kind { Ignore, Touch, Pointer, Switch, Keyboard };
-     struct Dev { int fd; Kind kind; QSocketNotifier *notifier; QString path; };
++    // phantom: monitored for activity but excluded from presence counting —
++    // the pogo connector's kbd interface enumerates even with no keyboard on.
++    struct Dev { int fd; Kind kind; QSocketNotifier *notifier; QString path;
++                 bool phantom = false; };
  
      void openDevices();
+     bool openDevice(const QString &path);
+@@ -42,4 +48,5 @@
+     QVector<Dev> m_devs;
+     bool m_hasTouch = false;
+     bool m_tabletMode = false;
++    int m_keyboards = 0;
+ };
 --- a/src/InputMonitor.cpp	2026-11-05 15:21:51.000000000 +0800
-+++ b/src/InputMonitor.cpp	2026-11-07 16:42:47.323441232 +0800
++++ b/src/InputMonitor.cpp	2026-11-07 16:48:08.399887077 +0800
 @@ -102,11 +102,29 @@
          hasTabletSwitch = testBit(sw.v, SW_TABLET_MODE);
      }
@@ -45,7 +62,24 @@
      else if (pointer || hasRel)
          kind = Pointer;          // mouse, touchpad, trackpoint
  
-@@ -134,11 +152,12 @@
+@@ -118,9 +136,15 @@
+     auto *notifier = new QSocketNotifier(fd, QSocketNotifier::Read, this);
+     connect(notifier, &QSocketNotifier::activated, this,
+             [this, fd, kind]() { onReadable(fd, kind); });
+-    m_devs.push_back({fd, kind, notifier, path});
++    // The pogo kbd interface is a phantom (see Dev): count it for key events
++    // only, never as "a keyboard is attached".
++    const bool phantom = kind == Keyboard &&
++                         devName.contains("Xiaomi Pad Keyboard");
++    m_devs.push_back({fd, kind, notifier, path, phantom});
+     if (kind == Touch)
+         m_hasTouch = true;
++    else if (kind == Keyboard && !phantom && ++m_keyboards == 1)
++        emit physicalKeyboardPresent(true);
+ 
+     // Seed the cached tablet-mode state from the switch's current position.
+     if (kind == Switch) {
+@@ -134,11 +158,10 @@
          }
      }
  
@@ -57,12 +91,20 @@
 +                      kind == Pointer ? "[pointer]" :
 +                      kind == Keyboard ? "[keyboard]" : "[switch]";
 +    qDebug() << "skvirt: monitoring" << path << tag << devName.constData();
-+    if (kind == Keyboard)
-+        emit keyboardAttached();
      return true;
  }
  
-@@ -174,7 +193,8 @@
+@@ -148,6 +171,9 @@
+         if (it->fd != fd)
+             continue;
+         qDebug() << "skvirt: device gone, closing" << it->path;
++        if (it->kind == Keyboard && !it->phantom && m_keyboards > 0 &&
++            --m_keyboards == 0)
++            emit physicalKeyboardPresent(false);
+         it->notifier->setEnabled(false);
+         it->notifier->deleteLater();
+         ::close(it->fd);
+@@ -174,7 +200,8 @@
  void InputMonitor::onReadable(int fd, Kind kind)
  {
      input_event evs[64];
@@ -72,7 +114,7 @@
  
      for (;;) {
          ssize_t n = ::read(fd, evs, sizeof evs);
-@@ -209,13 +229,16 @@
+@@ -209,13 +236,16 @@
                      tablet = e.value != 0;
                      tabletSeen = true;
                  }
@@ -90,24 +132,37 @@
              }
          }
          if (n < static_cast<ssize_t>(sizeof evs))
-@@ -231,4 +254,6 @@
+@@ -231,4 +261,6 @@
          emit touchActivity();
      if (pointer)
          emit pointerActivity();
 +    if (keypress)
 +        emit keyboardActivity();
  }
+--- a/src/KeyboardController.h	2026-11-05 15:21:51.000000000 +0800
++++ b/src/KeyboardController.h	2026-11-07 16:48:17.401899707 +0800
+@@ -176,4 +176,5 @@
+     bool m_touchMode = false;    // most recent interaction was a finger/pen, not a mouse
+     bool m_fieldFocused = false; // KWin reports an editable client is focused
+     bool m_tabletMode = false;   // SW_TABLET_MODE switch position from InputMonitor
++    bool m_physicalKeyboard = false;  // a usable hw keyboard is attached: OSK suppressed
+ };
 --- a/src/KeyboardController.cpp	2026-11-05 15:21:51.000000000 +0800
-+++ b/src/KeyboardController.cpp	2026-11-07 16:38:44.693113111 +0800
-@@ -157,6 +157,16 @@
++++ b/src/KeyboardController.cpp	2026-11-07 16:48:17.410899719 +0800
+@@ -157,11 +157,27 @@
              this, &KeyboardController::onPointerActivity);
      connect(m_input.get(), &InputMonitor::tabletModeChanged,
              this, &KeyboardController::onTabletModeChanged);
-+    // A physical keyboard means the OSK should get out of the way — both when
-+    // it appears (BT pair / USB attach) and when a real key is pressed.
-+    connect(m_input.get(), &InputMonitor::keyboardAttached, this, [this] {
-+        m_touchMode = false;
-+        hideKeyboard();
++    // While a usable physical keyboard is attached, the OSK stays out of the
++    // way entirely — like plugging in a mouse. A key press on ANY keyboard
++    // device (incl. the always-enumerated pogo interface) hides it too.
++    connect(m_input.get(), &InputMonitor::physicalKeyboardPresent, this,
++            [this](bool present) {
++        m_physicalKeyboard = present;
++        if (present) {
++            m_touchMode = false;
++            hideKeyboard();
++        }
 +    });
 +    connect(m_input.get(), &InputMonitor::keyboardActivity, this, [this] {
 +        m_touchMode = false;
@@ -116,3 +171,20 @@
      connect(m_kwin.get(), &KWinVk::textInputFocusChanged,
              this, &KeyboardController::onFieldFocusChanged);
  
+     m_fieldFocused = m_kwin->textInputFocused();
+     m_tabletMode = m_input->tabletMode();
++    m_physicalKeyboard = m_input->hasPhysicalKeyboard();
+ }
+ 
+ void KeyboardController::setVisible(bool v)
+@@ -182,8 +198,8 @@
+ 
+ void KeyboardController::showKeyboard()
+ {
+-    if (m_visible)
+-        return;
++    if (m_visible || m_physicalKeyboard)
++        return;  // suppressed while a real keyboard is attached
+     if (SkvirtSettings::showOnlyInTabletMode() && !m_tabletMode)
+         return;  // setting gates auto-show to tablet (convertible) mode
+     qDebug() << "skvirt: SHOW (touch + field focused)";

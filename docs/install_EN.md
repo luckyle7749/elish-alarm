@@ -440,9 +440,13 @@ sudo ninja -C build install   # KCM settings module (optional)
 - `0002-windows-style-bottom-row.patch`: bottom row from macOS `⌃⌥⌘` to
   Windows-style `Ctrl Win Alt`.
 - `0003-hide-on-physical-keyboard.patch`: InputMonitor learns keyboard
-  devices — connecting **or pressing** a physical keyboard (pogo/BT/USB)
-  hides the OSK; touch still raises it, pointer activity still hides per
-  `hideOnMouseMove`. Its own uinput device is excluded to prevent
+  devices and tracks presence — while a real keyboard (BT/USB) is
+  attached the OSK is **fully suppressed**; unplugging restores touch
+  raise. Any real keypress (incl. the pogo's always-enumerated kbd
+  interface) also hides it. Devices with alpha keys classify as keyboard
+  before pointer (BT keyboards like the R65 report REL axes and must not
+  be misread as mice); the pogo kbd interface is a phantom that never
+  counts toward presence; its own uinput device is excluded to prevent
   self-triggering.
 
 **System config** (shipped in this repo):
