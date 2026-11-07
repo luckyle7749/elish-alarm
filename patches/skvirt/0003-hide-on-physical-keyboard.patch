@@ -14,8 +14,8 @@
  
      void openDevices();
 --- a/src/InputMonitor.cpp	2026-11-05 15:21:51.000000000 +0800
-+++ b/src/InputMonitor.cpp	2026-11-07 16:38:44.367112677 +0800
-@@ -102,6 +102,10 @@
++++ b/src/InputMonitor.cpp	2026-11-07 16:42:47.323441232 +0800
+@@ -102,11 +102,29 @@
          hasTabletSwitch = testBit(sw.v, SW_TABLET_MODE);
      }
  
@@ -26,24 +26,26 @@
      Kind kind = Ignore;
      if (hasTabletSwitch)
          kind = Switch;           // e.g. "ThinkPad Extra Buttons" (SW_TABLET_MODE)
-@@ -109,6 +113,16 @@
+     else if (direct && (hasAbsMT || hasAbsX))
          kind = Touch;            // touchscreen / pen digitizer
-     else if (pointer || hasRel)
-         kind = Pointer;          // mouse, touchpad, trackpoint
 +    else if (testBit(evs.v, EV_KEY) &&
 +             !devName.contains("skvirt")) {
 +        // Physical keyboard? Require alpha keys so power/volume-only
 +        // devices do not count. Our own uinput device is excluded by name.
++        // Checked before Pointer: BT keyboards often also report REL axes
++        // (e.g. "R65 5.0 Keyboard") and must not be misread as mice.
 +        BitArray<KEY_CNT> keys;
 +        ioctl(fd, EVIOCGBIT(EV_KEY, sizeof keys.v), keys.v);
 +        if (testBit(keys.v, KEY_Q) || testBit(keys.v, KEY_A) ||
 +            testBit(keys.v, KEY_SPACE) || testBit(keys.v, KEY_ENTER))
 +            kind = Keyboard;
++        else if (pointer || hasRel)
++            kind = Pointer;      // mouse, touchpad, trackpoint
 +    }
+     else if (pointer || hasRel)
+         kind = Pointer;          // mouse, touchpad, trackpoint
  
-     if (kind == Ignore) {
-         ::close(fd);
-@@ -134,11 +148,12 @@
+@@ -134,11 +152,12 @@
          }
      }
  
@@ -60,7 +62,7 @@
      return true;
  }
  
-@@ -174,7 +189,8 @@
+@@ -174,7 +193,8 @@
  void InputMonitor::onReadable(int fd, Kind kind)
  {
      input_event evs[64];
@@ -70,7 +72,7 @@
  
      for (;;) {
          ssize_t n = ::read(fd, evs, sizeof evs);
-@@ -209,13 +225,16 @@
+@@ -209,13 +229,16 @@
                      tablet = e.value != 0;
                      tabletSeen = true;
                  }
@@ -88,7 +90,7 @@
              }
          }
          if (n < static_cast<ssize_t>(sizeof evs))
-@@ -231,4 +250,6 @@
+@@ -231,4 +254,6 @@
          emit touchActivity();
      if (pointer)
          emit pointerActivity();
