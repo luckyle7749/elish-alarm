@@ -449,7 +449,7 @@ sudo ninja -C build install   # KCM settings module (optional)
   counts toward presence; its own uinput device is excluded to prevent
   self-triggering.
 - `0004-add-dismiss-key.patch`: adds a `⌄` dismiss key at the right end
-  of the bottom row (Android convention) wired to `hidePanel()` —
+  of the number row, next to backspace, wired to `hidePanel()` —
   upstream had no manual-dismiss affordance; the panel could only go
   away on focus loss or touch elsewhere.
 
