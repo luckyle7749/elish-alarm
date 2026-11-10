@@ -469,6 +469,12 @@ sudo ninja -C build install   # KCM settings module (optional)
 | `configs/home/.local/share/fcitx5/rime/default.custom.yaml` | Selects the `rime_ice_suggestion` preset for Rime, paired with the `rime-ice-git` package |
 | `configs/home/.config/code-flags.conf` | VS Code (`visual-studio-code-bin` AUR): `--ozone-platform=wayland` native Wayland + `--enable-wayland-ime` so fcitx5/Rime works in the editor — without these it runs on XWayland (blurry, broken IME) |
 
+**VS Code (optional):** the official arm64 build lives in the AUR —
+`yay -S visual-studio-code-bin` (or `paru`). `archlinuxcn/code` is the
+OSS build: no Remote-SSH/Copilot/official marketplace, pick it only if
+those don't matter. Deploy the `code-flags.conf` from the table or it
+runs on XWayland — blurry and fcitx5 won't work.
+
 **Behavior notes:** skvirt is a layer-shell panel pinned to the screen
 bottom — **no dragging** (protocol limit, true of all OSKs). Settings live
 in System Settings → skvirt KCM or `skvirtrc`: `showOnlyInTabletMode`,

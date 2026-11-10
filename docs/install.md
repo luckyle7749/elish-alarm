@@ -425,6 +425,12 @@ sudo ninja -C build install   # KCM 设置面板(可选)
 | `configs/home/.local/share/fcitx5/rime/default.custom.yaml` | Rime 选用 `rime_ice_suggestion`（雾凇方案预设），配合 `rime-ice-git` 包 |
 | `configs/home/.config/code-flags.conf` | VS Code(`visual-studio-code-bin` AUR)：`--ozone-platform=wayland` 原生 Wayland + `--enable-wayland-ime` 让 fcitx5/Rime 在编辑器里可用——缺省会走 XWayland（模糊、输入法不灵） |
 
+**VS Code（可选）**：官方 arm64 构建在 AUR——
+`yay -S visual-studio-code-bin`（或 `paru`)。`archlinuxcn/code` 是
+OSS 构建，没有 Remote-SSH/Copilot/官方扩展市场，需求不同再选它。
+装完务必配上表的 `code-flags.conf`，否则走 XWayland 模糊且
+fcitx5 不工作。
+
 **行为说明**:skvirt 是 layer-shell 面板，钉在屏幕底部，**不支持
 拖动**（协议限定，所有 OSK 皆然）。设置项在 系统设置→skvirt KCM
 或 `skvirtrc`：`showOnlyInTabletMode`、`hideOnMouseMove`、
