@@ -1,0 +1,29 @@
+--- a/src/qml/SkvirtKeyboard.qml	2026-11-10 15:41:20.410430588 +0800
++++ b/src/qml/SkvirtKeyboard.qml	2026-11-10 15:41:03.566340957 +0800
+@@ -43,12 +43,13 @@
+         ["control", "Ctrl", "", 1, "ctrl", "l"],
+         ["command", "Win", "", 1.25, "super", "l"],
+         ["option", "Alt", "", 1, "alt", "l"],
+-        ["space", "", "", 5.5, "", "c"],
++        ["space", "", "", 4.5, "", "c"],
+         ["option", "Alt", "", 1, "alt", "r"],
+         ["control", "Ctrl", "", 1, "ctrl", "r"],
+         ["left", "◀", "", 1, "", "c"],
+         ["updown", "", "", 1, "", "c"],
+-        ["right", "▶", "", 1, "", "c"]
++        ["right", "▶", "", 1, "", "c"],
++        ["hide", "⌄", "", 1, "", "c"]
+     ]
+ 
+     // Fallback typing rows, used when the active IM is not a keyboard-* one
+--- a/src/qml/Key.qml	2026-11-10 15:41:20.408750248 +0800
++++ b/src/qml/Key.qml	2026-11-10 15:41:03.571340984 +0800
+@@ -435,6 +435,8 @@
+                 KeyboardController.toggleSymbolMode()
+             else if (n === "lang")
+                 KeyboardController.cycleLayout()
++            else if (n === "hide")
++                KeyboardController.hidePanel()
+             else if (root.specialKeys.indexOf(n) !== -1)
+                 KeyboardController.sendSpecial(n)
+             else if (root.positional)
