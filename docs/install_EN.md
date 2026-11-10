@@ -448,11 +448,13 @@ sudo ninja -C build install   # KCM settings module (optional)
   be misread as mice); the pogo kbd interface is a phantom that never
   counts toward presence; its own uinput device is excluded to prevent
   self-triggering.
-- `0004-add-dismiss-key.patch`: drops the bottom-row right Alt/Ctrl and
-  puts a 2u `⌄` dismiss key in their place, right of the arrow cluster,
-  wired to `hidePanel()` — upstream had no manual-dismiss affordance;
-  the panel could only go away on focus loss or touch elsewhere.
-  Space 5.5→5.75.
+- `0004-add-dismiss-key.patch`: drops the bottom-row right Alt/Ctrl;
+  arrows become a full-height inverted-T — `▲` moves to row 4 aligned
+  above `▼`, right Shift shrinks to 2u, `↩` takes the bottom-right
+  corner; a `⌄` dismiss key sits left of the arrows wired to
+  `hidePanel()` (upstream had no manual-dismiss affordance; the panel
+  could only go away on focus loss or touch elsewhere). Space 5.5→5.75,
+  both Shifts 2.0u.
 
 **System config** (shipped in this repo):
 

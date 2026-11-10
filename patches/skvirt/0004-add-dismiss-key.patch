@@ -1,6 +1,18 @@
 --- a/src/qml/SkvirtKeyboard.qml	2026-11-10 15:43:08.144167088 +0800
-+++ b/src/qml/SkvirtKeyboard.qml	2026-11-10 15:55:47.855141876 +0800
-@@ -43,12 +43,11 @@
++++ b/src/qml/SkvirtKeyboard.qml	2026-11-10 16:11:46.711041475 +0800
+@@ -23,8 +23,9 @@
+     readonly property var kTab:    ["tab", "⇥", "", 1.5, "tab", "l"]
+     readonly property var kCaps:   ["capslock", "⇪", "", 1.75, "caps lock", "l"]
+     readonly property var kReturn: ["enter", "↩", "", 2.25, "return", "r"]
+-    readonly property var kLShift: ["shift", "⇧", "", 2.25, "shift", "l"]
+-    readonly property var kRShift: ["shift", "⇧", "", 2.75, "shift", "r"]
++    readonly property var kLShift: ["shift", "⇧", "", 2.0, "shift", "l"]
++    readonly property var kUp:     ["up", "▲", "", 1, "", "r"]
++    readonly property var kRShift: ["shift", "⇧", "", 2.0, "shift", "r"]
+ 
+     // esc + F1–F12: 1.5 + 12 × 1.125 = 15 units.
+     readonly property var functionRowData: [
+@@ -43,12 +44,12 @@
          ["control", "Ctrl", "", 1, "ctrl", "l"],
          ["command", "Win", "", 1.25, "super", "l"],
          ["option", "Alt", "", 1, "alt", "l"],
@@ -8,14 +20,25 @@
 -        ["option", "Alt", "", 1, "alt", "r"],
 -        ["control", "Ctrl", "", 1, "ctrl", "r"],
 +        ["space", "", "", 5.75, "", "c"],
++        ["hide", "⌄", "", 1, "", "c"],
          ["left", "◀", "", 1, "", "c"],
-         ["updown", "", "", 1, "", "c"],
+-        ["updown", "", "", 1, "", "c"],
 -        ["right", "▶", "", 1, "", "c"]
++        ["down", "▼", "", 1, "", "c"],
 +        ["right", "▶", "", 1, "", "c"],
-+        ["hide", "⌄", "", 2, "", "c"]
++        ["enter", "↩", "", 1, "", "c"]
      ]
  
      // Fallback typing rows, used when the active IM is not a keyboard-* one
+@@ -176,7 +177,7 @@
+         rows.push(typingRows[0].concat([kDelete]))
+         rows.push([kTab].concat(typingRows[1]))
+         rows.push([kCaps].concat(typingRows[2], [kReturn]))
+-        rows.push([kLShift].concat(typingRows[3], [kRShift]))
++        rows.push([kLShift].concat(typingRows[3], [kUp, kRShift]))
+         rows.push(bottomRowData)
+         return rows
+     }
 --- a/src/qml/Key.qml	2026-11-10 15:43:08.141857787 +0800
 +++ b/src/qml/Key.qml	2026-11-10 15:41:03.571340984 +0800
 @@ -435,6 +435,8 @@
