@@ -423,6 +423,7 @@ sudo ninja -C build install   # KCM 设置面板(可选)
 | `configs/home/.config/fcitx5/profile` | 输入法组：`keyboard-us` + `rime`，默认 `rime`——不装这个 fcitx5 只有英文键盘 |
 | `configs/home/.config/fcitx5/config` | 快捷键：`Super+Space` 激活/关闭输入法（物理键盘按 Windows 习惯切输入法） |
 | `configs/home/.local/share/fcitx5/rime/default.custom.yaml` | Rime 选用 `rime_ice_suggestion`（雾凇方案预设），配合 `rime-ice-git` 包 |
+| `configs/home/.config/code-flags.conf` | VS Code(`visual-studio-code-bin` AUR)：`--ozone-platform=wayland` 原生 Wayland + `--enable-wayland-ime` 让 fcitx5/Rime 在编辑器里可用——缺省会走 XWayland（模糊、输入法不灵） |
 
 **行为说明**:skvirt 是 layer-shell 面板，钉在屏幕底部，**不支持
 拖动**（协议限定，所有 OSK 皆然）。设置项在 系统设置→skvirt KCM

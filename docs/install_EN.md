@@ -467,6 +467,7 @@ sudo ninja -C build install   # KCM settings module (optional)
 | `configs/home/.config/fcitx5/profile` | IM group: `keyboard-us` + `rime`, default `rime` — without it fcitx5 only offers the English keyboard |
 | `configs/home/.config/fcitx5/config` | Hotkeys: `Super+Space` activates/deactivates the IM (Windows-style switching for physical keyboards) |
 | `configs/home/.local/share/fcitx5/rime/default.custom.yaml` | Selects the `rime_ice_suggestion` preset for Rime, paired with the `rime-ice-git` package |
+| `configs/home/.config/code-flags.conf` | VS Code (`visual-studio-code-bin` AUR): `--ozone-platform=wayland` native Wayland + `--enable-wayland-ime` so fcitx5/Rime works in the editor — without these it runs on XWayland (blurry, broken IME) |
 
 **Behavior notes:** skvirt is a layer-shell panel pinned to the screen
 bottom — **no dragging** (protocol limit, true of all OSKs). Settings live
