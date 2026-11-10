@@ -1,9 +1,11 @@
 --- a/src/qml/SkvirtKeyboard.qml	2026-11-10 15:43:08.144167088 +0800
-+++ b/src/qml/SkvirtKeyboard.qml	2026-11-10 15:42:42.076882958 +0800
-@@ -20,6 +20,7 @@
++++ b/src/qml/SkvirtKeyboard.qml	2026-11-10 15:46:02.175094657 +0800
+@@ -19,7 +19,8 @@
+     // Every row adds up to 15 units, so the rows line up like a real keyboard
      // instead of each stretching to the panel width.
  
-     readonly property var kDelete: ["backspace", "⌫", "", 2, "delete", "r"]
+-    readonly property var kDelete: ["backspace", "⌫", "", 2, "delete", "r"]
++    readonly property var kDelete: ["backspace", "⌫", "", 1, "delete", "r"]
 +    readonly property var kHide:   ["hide", "⌄", "", 1, "", "r"]
      readonly property var kTab:    ["tab", "⇥", "", 1.5, "tab", "l"]
      readonly property var kCaps:   ["capslock", "⇪", "", 1.75, "caps lock", "l"]
